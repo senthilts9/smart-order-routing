@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Order Routing Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn:hover { 
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            background: #4caf50;
+            font-size: 12px;
+        }
+        .exchange-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+        }
+        #result {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Smart Order Routing Dashboard</h1>
+            <p>ML-Driven Order Execution Across Multiple Exchanges</p>
+            <span class="status" id="status">Connecting...</span>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <h3>Submit Order</h3>
+                <select id="symbol">
+                    <option>AAPL</option>
+                    <option>GOOGL</option>
+                    <option>MSFT</option>
+                    <option>AMZN</option>
+                    <option>TSLA</option>
+                </select>
+                <input type="number" id="quantity" placeholder="Quantity" value="1000">
+                <select id="side">
+                    <option>BUY</option>
+                    <option>SELL</option>
+                </select>
+                <button class="btn" onclick="submitOrder()">Execute Order</button>
+                <div id="result"></div>
+            </div>
+            
+            <div class="card">
+                <h3>Exchange Status</h3>
+                <div id="exchanges">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h3>Performance</h3>
+                <div id="performance">Loading...</div>
+            </div>
+            
+            <div class="card">
+                <h3>Market Data</h3>
+                <div id="market-data">Loading...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        
+        async function loadExchanges() {
+            try {
+                const resp = await fetch(API_URL + '/exchanges');
+                const data = await resp.json();
+                const html = data.map(ex => `
+                    <div class="exchange-item">
+                        <strong>${ex.exchange_id}</strong><br>
+                        Latency: ${ex.latency_ms.toFixed(1)}ms | 
+                        Liquidity: ${(ex.liquidity_score*100).toFixed(0)}%
+                    </div>
+                `).join('');
+                document.getElementById('exchanges').innerHTML = html;
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').style.background = '#4caf50';
+            } catch (err) {
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').style.background = '#f44336';
+            }
+        }
+        
+        async function loadPerformance() {
+            try {
+                const resp = await fetch(API_URL + '/analytics/performance');
+                const data = await resp.json();
+                document.getElementById('performance').innerHTML = `
+                    <p>Total Orders: ${data.total_orders || 0}</p>
+                    <p>Success Rate: ${((data.success_rate || 0)*100).toFixed(1)}%</p>
+                    <p>Avg Execution: ${(data.avg_execution_time_ms || 0).toFixed(1)}ms</p>
+                `;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        
+        async function submitOrder() {
+            const order = {
+                symbol: document.getElementById('symbol').value,
+                quantity: parseFloat(document.getElementById('quantity').value),
+                order_type: 'MARKET',
+                side: document.getElementById('side').value
+            };
+            
+            try {
+                const resp = await fetch(API_URL + '/orders', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(order)
+                });
+                
+                const result = await resp.json();
+                document.getElementById('result').innerHTML = `
+                    <strong>Order ${result.success ? 'Executed' : 'Failed'}</strong><br>
+                    ID: ${result.order_id}<br>
+                    Executed: ${result.total_executed?.toFixed(0)} @ $${result.average_price?.toFixed(2)}<br>
+                    Time: ${result.execution_time_ms?.toFixed(1)}ms
+                `;
+                
+                loadPerformance();
+            } catch (err) {
+                document.getElementById('result').innerHTML = `<strong>Error: ${err.message}</strong>`;
+            }
+        }
+        
+        // Initial load
+        loadExchanges();
+        loadPerformance();
+        setInterval(loadPerformance, 5000);
+        
+        // WebSocket for market data
+        const ws = new WebSocket('ws://localhost:8000/stream/market-data');
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const symbol = document.getElementById('symbol').value;
+            if (data[symbol]) {
+                const marketHtml = Object.entries(data[symbol]).slice(0, 3).map(([ex, md]) => `
+                    <div>${ex}: $${md.bid_price?.toFixed(2)} / $${md.ask_price?.toFixed(2)}</div>
+                `).join('');
+                document.getElementById('market-data').innerHTML = marketHtml;
+            }
+        };
+    </script>
+</body>
+</html>

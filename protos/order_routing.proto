@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package order_routing;
+
+service OrderRouter {
+    rpc RouteOrder (OrderRequest) returns (OrderResponse);
+    rpc GetExchangeStatus (ExchangeStatusRequest) returns (ExchangeStatusResponse);
+    rpc StreamMarketData (MarketDataRequest) returns (stream MarketData);
+}
+
+message OrderRequest {
+    string order_id = 1;
+    string symbol = 2;
+    double quantity = 3;
+    enum OrderType {
+        MARKET = 0;
+        LIMIT = 1;
+        STOP = 2;
+    }
+    OrderType order_type = 4;
+    double price = 5;
+    enum Side {
+        BUY = 0;
+        SELL = 1;
+    }
+    Side side = 6;
+    int64 timestamp = 7;
+}
+
+message OrderResponse {
+    string order_id = 1;
+    bool success = 2;
+    string exchange_id = 3;
+    double executed_price = 4;
+    double executed_quantity = 5;
+    int64 execution_time_ms = 6;
+    repeated RouteDecision routing_decisions = 7;
+}
+
+message RouteDecision {
+    string exchange_id = 1;
+    double allocated_quantity = 2;
+    double confidence_score = 3;
+    string reason = 4;
+}
+
+message ExchangeStatusRequest {
+    repeated string exchange_ids = 1;
+}
+
+message ExchangeStatusResponse {
+    repeated ExchangeInfo exchanges = 1;
+}
+
+message ExchangeInfo {
+    string exchange_id = 1;
+    bool is_active = 2;
+    double latency_ms = 3;
+    double liquidity_score = 4;
+    double fee_percentage = 5;
+}
+
+message MarketDataRequest {
+    string symbol = 1;
+    repeated string exchanges = 2;
+}
+
+message MarketData {
+    string exchange_id = 1;
+    string symbol = 2;
+    double bid_price = 3;
+    double ask_price = 4;
+    double bid_volume = 5;
+    double ask_volume = 6;
+    int64 timestamp = 7;
+}
